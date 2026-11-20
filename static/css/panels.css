@@ -1,0 +1,4 @@
+/* Plug-in panels for the Virgin River dashboard. */
+#reservoirs .tiles, #snotel .tiles, #flood .tiles, #colorado .tiles { margin: 8px 0 12px; }
+.cbrfc-tbl th[scope="row"] { text-align: left; font-weight: 500; white-space: normal; }
+.cbrfc-tbl td, .cbrfc-tbl th { font-variant-numeric: tabular-nums; }
