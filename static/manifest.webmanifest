@@ -1,0 +1,13 @@
+{
+  "name": "Virgin River basin water dashboard",
+  "short_name": "Virgin River",
+  "description": "Flows, reservoirs, snow, rain, flood stage, and Colorado River context for the Virgin River basin.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f3",
+  "theme_color": "#11181c",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

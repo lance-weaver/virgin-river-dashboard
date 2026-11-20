@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virgin River basin water dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#f4f6f3">
+<meta name="description" content="Flows, reservoir storage, snowpack, rain, flood stage, and Lake Powell and Lake Mead context for the Virgin River basin. Built for the Washington County Water Conservancy District from public USGS, NRCS, NOAA, and USBR data.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Virgin River basin water dashboard">
+<meta property="og:description" content="A water picture of the Virgin River from Zion to Littlefield: gauges, reservoirs, snow, flood stage, and Colorado River context.">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/layout.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/panels.css">
+<link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brandwrap">
+      <p class="brand">Virgin River</p>
+      <p class="brand-sub">Basin water dashboard for the Washington County Water Conservancy District</p>
+    </div>
+    <div class="bar">
+      <span id="asof"></span>
+      <button id="sources-btn" type="button">Sources</button>
+      <button id="refresh" type="button">Refresh data</button>
+      <span id="status" class="sr-only" role="status" aria-live="polite"></span>
+    </div>
+  </header>
+
+  <div class="knobs" aria-label="What to show">
+    <div class="knob" role="group" aria-labelledby="topic-l">
+      <span class="knob-l" id="topic-l">Topic</span>
+      <div class="seg" id="topic">
+        <button type="button" value="glance" aria-pressed="true">At a glance</button>
+        <button type="button" value="river" aria-pressed="false">River</button>
+        <button type="button" value="reservoirs" aria-pressed="false">Reservoirs</button>
+        <button type="button" value="sky" aria-pressed="false">Snow and rain</button>
+        <button type="button" value="flood" aria-pressed="false">Flood and sediment</button>
+        <button type="button" value="forecast" aria-pressed="false">Forecasts</button>
+        <button type="button" value="colorado" aria-pressed="false">Powell and Mead</button>
+      </div>
+    </div>
+    <form class="period knob" id="period">
+      <label for="preset">Period
+        <select id="preset">
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="365">Last year</option>
+          <option value="3652">Last 10 years</option>
+          <option value="all">Since 1929</option>
+          <option value="custom">Custom dates</option>
+        </select>
+      </label>
+      <label for="from">From <input type="date" id="from" min="1929-01-01" required></label>
+      <label for="to">To <input type="date" id="to" min="1929-01-01" required></label>
+      <button type="submit">Show</button>
+    </form>
+    <div class="knob" role="group" aria-labelledby="view-l">
+      <span class="knob-l" id="view-l">View</span>
+      <div class="seg" id="view">
+        <button type="button" value="summary" aria-pressed="true">Summary</button>
+        <button type="button" value="map" aria-pressed="false">Map</button>
+        <button type="button" value="detail" aria-pressed="false">Detail</button>
+      </div>
+    </div>
+  </div>
+
+  <main>
+    <section data-topic="all" data-view="period" class="answer" aria-labelledby="answer-h">
+      <p class="when" id="when"></p>
+      <h1 id="answer-h">Loading the latest gauge readings…</h1>
+      <p id="answer-p"></p>
+      <details class="howto"><summary>Sources for these numbers</summary><p class="src" id="src-answer"></p></details>
+    </section>
+
+    <section class="top" aria-label="Key numbers">
+      <section class="now" aria-labelledby="now-h">
+        <h2 id="now-h">Right now <span class="now-time" id="now-time"></span></h2>
+        <ul class="now-list" id="now-list"><li><span class="sub">Loading live readings…</span></li></ul>
+        <details class="howto"><summary>About these readings</summary><p class="src" id="src-now"></p></details>
+      </section>
+      <ul data-topic="all" data-view="period" class="cards" aria-label="This period in four numbers">
+        <li><a class="card" href="#stage" data-go="river"><span class="lbl">Virgin at Hurricane</span><span class="val" id="c-flow">—</span><span class="sub" id="c-flow-sub"></span><span class="more">Mainstem profile</span></a></li>
+        <li><a class="card" href="#stage" data-go="reservoirs"><span class="lbl">Reservoirs</span><span class="val" id="c-res">—</span><span class="sub" id="c-res-sub"></span><span class="more">Quail, Sand Hollow, and the others</span></a></li>
+        <li><a class="card" href="#stage" data-go="sky"><span class="lbl">Snowpack</span><span class="val" id="c-snow">—</span><span class="sub" id="c-snow-sub"></span><span class="more">SNOTEL sites</span></a></li>
+        <li><a class="card" href="#stage" data-go="flood"><span class="lbl">Flood stage</span><span class="val" id="c-flood">—</span><span class="sub" id="c-flood-sub"></span><span class="more">Hurricane, Virgin, Littlefield</span></a></li>
+      </ul>
+    </section>
+
+    <div id="stage">
+      <section class="facts" id="stage-facts" aria-label="Summary">
+        <div data-topic="glance river" data-view="summary" class="fact">
+          <h2>Down the mainstem</h2>
+          <p class="lead" id="flow-lead"></p>
+          <ul class="flowlist" id="flowlist"></ul>
+          <p class="src" id="src-flow"></p>
+        </div>
+        <div data-topic="river" data-view="summary" class="fact">
+          <h2>Tributaries</h2>
+          <p class="lead" id="trib-lead"></p>
+          <ul class="flowlist" id="triblist"></ul>
+          <p class="src" id="src-trib"></p>
+        </div>
+      </section>
+      <div id="stage-sections">
+        <section data-topic="all glance" data-view="map" class="section" aria-labelledby="map-h">
+          <h2 id="map-h">The basin</h2>
+          <div id="map" class="map"></div>
+          <div class="map-toggles">
+            <label class="src" for="show-radar"><input type="checkbox" id="show-radar" checked> Live rain radar <span id="radar-time"></span></label>
+          </div>
+          <div class="radar-loop" id="radar-loop">
+            <button type="button" id="radar-play" aria-pressed="false">Play</button>
+            <label for="radar-span">Loop
+              <select id="radar-span"><option value="3">Last 3 hours</option><option value="12">Last 12 hours</option><option value="24">Last 24 hours</option></select>
+            </label>
+            <input type="range" id="radar-slider" min="0" max="18" step="1" value="18" aria-label="Radar time, last 3 hours in 10-minute steps">
+          </div>
+          <details class="howto"><summary>How to read the map, and sources</summary>
+            <p class="note">Dark dots are mainstem gauges, blue dots are tributaries, orange dots are reservoirs, and green dots are SNOTEL stations. A hollow dot had no reading in this period. The frame is the Virgin River basin: HUC 15010008, 15010009, and 15010010, from the headwaters above Springdale to Littlefield, Arizona. Lake Powell and Lake Mead sit outside this frame.</p>
+            <p class="src" id="imagery-note"></p>
+            <p class="src" id="src-map"></p>
+            <p class="src">Radar: National Weather Service NEXRAD base reflectivity, a mosaic updated about every 5 minutes, from the <a href="https://mesonet.agron.iastate.edu/ogc/">Iowa Environmental Mesonet</a>. Brighter colors mean heavier rain or snow. Mountains block the lowest beams, so light rain in some canyons can be missed.</p>
+          </details>
+          <ul class="sr-only" id="map-list" aria-label="Places on the map"></ul>
+        </section>
+
+        <section data-topic="glance" data-view="summary" class="section" aria-labelledby="glance-flow-h">
+          <h2 id="glance-flow-h">Hurricane gauge</h2>
+          <p class="note">Virgin River near Hurricane, USGS 09408150, just downstream of the Quail Creek reach. This is the gauge to watch for water passing the district's reservoirs.</p>
+          <div class="chart" id="chart-glance-flow"></div>
+          <p class="src" id="src-glance-flow"></p>
+        </section>
+
+        <section data-topic="river" data-view="summary" class="section" aria-labelledby="rivers-h">
+          <h2 id="rivers-h">Mainstem, Virgin to Littlefield</h2>
+          <p class="note">The same river at seven gauges. A rise between two of them is a tributary or a return; a drop is a diversion or a loss. Shaded band is the period you picked.</p>
+          <div class="chart" id="chart-rivers"></div>
+          <p class="src" id="src-rivers"></p>
+        </section>
+        <section data-topic="river" data-view="summary" class="section" aria-labelledby="tribs-h">
+          <h2 id="tribs-h">North Fork, East Fork, Santa Clara, Fort Pearce</h2>
+          <p class="note">North Fork and East Fork join above Virgin. Santa Clara comes in at St. George. Fort Pearce Wash is usually dry and runs hard in a storm.</p>
+          <div class="chart" id="chart-tribs"></div>
+          <p class="src" id="src-tribs"></p>
+        </section>
+        <section data-topic="river" data-view="detail" class="section" aria-labelledby="cum-h">
+          <h2 id="cum-h">Hurricane against the prior two weeks</h2>
+          <p class="note">Running acre-feet relative to the median flow of the 14 days before this period, at the Hurricane gauge only. A falling line means the river was below that recent median. Shown for periods up to two months, where that median still means something.</p>
+          <div class="chart" id="chart-cum"></div>
+          <p class="src" id="src-cum"></p>
+        </section>
+        <section data-topic="river" data-view="detail" class="section" aria-labelledby="tbl-h">
+          <h2 id="tbl-h">Every gauge</h2>
+          <div class="tablewrap"><table id="site-table">
+            <caption id="tbl-cap"></caption>
+            <thead><tr>
+              <th scope="col">USGS site</th><th scope="col">Gauge</th><th scope="col">Role</th>
+              <th scope="col">Prior 2 weeks (cfs)</th><th scope="col">Peak (cfs)</th><th scope="col">Latest (cfs)</th>
+              <th scope="col">Average (cfs)</th><th scope="col">Water (acre-ft)</th><th scope="col">Versus prior 2 weeks (acre-ft)</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table></div>
+          <p class="src" id="src-table"></p>
+        </section>
+
+        <section data-topic="river" data-view="history" class="section" aria-labelledby="hist-h">
+          <h2 id="hist-h">Littlefield since 1929</h2>
+          <p class="note" id="hist-lead">Monthly mean discharge of the Virgin River at Littlefield, Arizona, the gauge with a continuous daily record back to 1929. This is the water that has left the basin on its way to Lake Mead. Drag the slider to look at a stretch, then show that stretch on the rest of the page when you are running the dashboard locally.</p>
+          <div class="hist-bar"><span id="hist-range"></span><button type="button" id="hist-apply">Show this stretch</button></div>
+          <div class="chart tall" id="chart-history"></div>
+          <p class="src" id="src-history"></p>
+        </section>
+        <section data-topic="river" data-view="history" class="section" aria-labelledby="annual-h">
+          <h2 id="annual-h">Water passing Littlefield each year</h2>
+          <p class="note">Total of the daily mean discharge at Littlefield, by water year (October through September, named for the year it ends). Years missing more than about a month of days are left off, so a gap is not drawn as a drought. The Virgin's flood years and its dry years are both in this record.</p>
+          <div class="chart tall" id="chart-annual"></div>
+          <p class="src" id="src-annual"></p>
+        </section>
+      </div>
+      <p class="note" id="stage-empty" hidden></p>
+    </div>
+
+    <details class="about" id="about">
+      <summary>Method and data sources</summary>
+      <section class="method" aria-label="Method">
+        <dl class="glossary">
+          <dt>cfs</dt><dd>Cubic feet per second. One cfs is about 7.5 gallons a second, and about 1.98 acre-feet a day.</dd>
+          <dt>acre-ft</dt><dd>Enough water to cover one acre one foot deep: 325,851 gallons.</dd>
+          <dt>FNU</dt><dd>Formazin nephelometric units, the USGS scale for turbidity. Higher means more sediment in the water, not a load in tons.</dd>
+          <dt>SWE</dt><dd>Snow water equivalent, the depth of water if the snowpack melted, in inches.</dd>
+        </dl>
+        <p><b>What this is.</b> A public-data picture of the Virgin River basin for the Washington County Water Conservancy District. It is not the District's internal operations system. Reservoir figures are end-of-month values from NRCS, not WCWCD's daily telemetry. Recent USGS readings are provisional and get revised.</p>
+        <p><b>How the river numbers are worked out.</b> USGS instantaneous and daily discharge are stored in DuckDB and totaled in SQL. Mainstem gauges are a profile of one river, from Virgin to Littlefield, and are not added together. Tributaries are reported beside that profile. Periods up to two months use 15-minute readings averaged by hour. Longer periods use daily means. "Prior two weeks" is the median of the 14 days before the period, and the comparison is only drawn for those shorter periods. Acre-feet equal cfs times hours, divided by 12.1.</p>
+        <p><b>Where.</b> HUC 15010008 (Upper Virgin), 15010009 (Fort Pearce Wash), and 15010010 (Lower Virgin). The map frame is about 114.1°W to 112.5°W and 36.85°N to 37.65°N.</p>
+        <p><b>Left for a later version.</b> Canal diversions from the Utah Division of Water Rights, points of diversion, land use, and open-water evaporation. Daily reservoir telemetry, when the District wants to connect it, fits beside the monthly NRCS series without replacing it.</p>
+      </section>
+      <footer class="sources" aria-labelledby="sources-h">
+        <h2 id="sources-h">Data sources</h2>
+        <ul>
+          <li>Streamflow and turbidity: <a href="https://waterdata.usgs.gov/">USGS National Water Information System</a>, instantaneous values and daily means. Turbidity is parameter 63680. Gauges: 09406000, 09406100, 09408135, 09408150, 09413200, 09413500, 09415000, 09405500, 09404900, 09408400, 09413000, 09408195.</li>
+          <li>Long record: USGS 09415000, Virgin River at Littlefield, Arizona, daily mean discharge since 1929.</li>
+          <li>Reservoir storage: <a href="https://wcc.sc.egov.usda.gov/awdbRestApi/swagger-ui/index.html">NRCS Air and Water Database</a>, element RESC, monthly, stations 09UTQUAI, 09UTSAND, 09UTGUNL, 09UTKOLB, and 09UTIVIN (UT:BOR). Capacity from each station's metadata. Daily storage is not published there.</li>
+          <li>Snowpack: NRCS SNOTEL via the same AWDB, element WTEQ daily with the daily median. Stations 561 Kolob, 853 Webster Flat, 593 Long Valley Jct, 1066 Gardner Peak, 1065 Gutz Peak (UT:SNTL).</li>
+          <li>Rain: <a href="https://www.rcc-acis.org/">NOAA Applied Climate Information System</a> MultiStnData, daily precipitation inside the basin box, from NWS, airport, and <a href="https://www.cocorahs.org/">CoCoRaHS</a> stations. The valley median uses stations below 5,000 feet that reported nearly every day.</li>
+          <li>Flood stage: <a href="https://api.water.noaa.gov/nwps/v1/gauges">NWS National Water Prediction Service</a> gauges HURU1 (Hurricane), VIRU1 (Virgin), and VLTA3 (Littlefield).</li>
+          <li>Forecasts: <a href="https://www.cbrfc.noaa.gov/">NOAA Colorado Basin River Forecast Center</a>, water-supply area VG, and the short-range flow forecast at HURU1.</li>
+          <li>Lake Powell and Lake Mead: <a href="https://www.usbr.gov/uc/water/hydrodata/">USBR Upper Colorado hydrodata</a>, Powell reservoir 919 parameters 49 (pool elevation) and 17 (storage), Mead reservoir 921 parameters 49 and 17. If those files fail, the same series is read from <a href="https://data.usbr.gov/">USBR RISE</a> (Powell items 508 and 509, Mead items 6123 and 6124).</li>
+          <li>Satellite picture: <a href="https://planetarycomputer.microsoft.com/dataset/sentinel-2-l2a">Copernicus Sentinel-2 Level-2A via Microsoft Planetary Computer</a>, and <a href="https://s2maps.eu">Sentinel-2 cloudless 2024 by EOX</a> (CC BY-NC-SA 4.0). Place names: Esri, HERE, Garmin, OpenStreetMap contributors.</li>
+          <li>Radar: NWS NEXRAD base reflectivity, tiles from the <a href="https://mesonet.agron.iastate.edu/">Iowa Environmental Mesonet</a>.</li>
+          <li>Right now: USGS instantaneous values and the St. George airport (KSGU) observation from the <a href="https://www.weather.gov/documentation/services-web-api">National Weather Service API</a>, fetched by your browser.</li>
+        </ul>
+        <p class="credit">Based on <a href="https://github.com/clintonlunn/gsl-dashboard">Clinton Lunn's gsl-dashboard</a>. Reused with his permission.</p>
+      </footer>
+    </details>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
